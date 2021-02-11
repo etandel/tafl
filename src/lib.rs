@@ -1,5 +1,11 @@
+extern crate pest;
+
+#[macro_use]
+extern crate pest_derive;
+
 mod command {
     use std::fmt;
+    use std::str::FromStr;
 
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     struct Square(u8, u8);
@@ -21,8 +27,10 @@ mod command {
         }
     }
 
+    #[derive(Clone, Debug, Eq, PartialEq)]
     struct Position {}
 
+    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     struct Move(Square, Square);
 
     impl Move {}
@@ -33,11 +41,25 @@ mod command {
         }
     }
 
+    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     enum Side {
         Attackers,
         Deffenders,
     }
 
+    impl FromStr for Side {
+        type Err = String;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            match s {
+                "attackers" => Ok(Side::Attackers),
+                "defenders" => Ok(Side::Deffenders),
+                _ => Err(format!("Invalid side: {}", s).into()),
+            }
+        }
+    }
+
+    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     enum ErrorCode {
         WrongSide,
         IllegalMove,
@@ -45,6 +67,21 @@ mod command {
         BerserkModeIllegalMove,
     }
 
+    impl FromStr for ErrorCode {
+        type Err = String;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            match s {
+                "1" => Ok(ErrorCode::WrongSide),
+                "2" => Ok(ErrorCode::IllegalMove),
+                "3" => Ok(ErrorCode::BerserkModeWrongSide),
+                "4" => Ok(ErrorCode::BerserkModeIllegalMove),
+                _ => Err(format!("Invalid error code: {}", s)),
+            }
+        }
+    }
+
+    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     enum FinishReason {
         ExitBeforeVictory,
         Draw,
@@ -52,18 +89,84 @@ mod command {
         DeffendersWin,
     }
 
+    impl FromStr for FinishReason {
+        type Err = String;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            match s {
+                "0" => Ok(FinishReason::ExitBeforeVictory),
+                "1" => Ok(FinishReason::Draw),
+                "2" => Ok(FinishReason::AttackersWin),
+                "3" => Ok(FinishReason::DeffendersWin),
+                _ => Err(format!("Invalid reason: {}", s)),
+            }
+        }
+    }
+
+    #[derive(Clone, Debug, Eq, PartialEq)]
     enum OpenTaflCommand {
-        Rules(String),
-        Position(Position),
+        Rules(String),      // TODO
+        Position(Position), // TODO
         Side(Side),
-        Clock(u64, u64, u64, u64, u64),
-        Analyze(u64, u64),
+        Clock(u64, u64, u64, u64, u64), // TODO
+        Analyze(u64, u64),              // TODO
         Play(Side),
-        Move(Position),
+        Move(Position), // TODO
         Error(ErrorCode),
-        OponentMove(Vec<Move>, Position),
+        OponentMove(Vec<Move>, Position), // TODO
         Finish(FinishReason),
         Goodbye,
+    }
+
+    use anyhow::{Error, Result};
+    use pest::Parser;
+
+    #[derive(Parser)]
+    #[grammar = "command_grammar.pest"]
+    struct CommandParser;
+
+    impl FromStr for OpenTaflCommand {
+        type Err = Error;
+
+        fn from_str(s: &str) -> Result<Self> {
+            use pest::iterators::Pair;
+
+            let cmd = CommandParser::parse(Rule::cmd, s)?.next().unwrap(); // unfailable
+
+            fn parse_value(pair: Pair<Rule>) -> OpenTaflCommand {
+                match pair.as_rule() {
+                    Rule::cmd => parse_value(pair.into_inner().next().unwrap()),
+
+                    Rule::goodbye_cmd => OpenTaflCommand::Goodbye,
+
+                    Rule::finish_cmd => {
+                        let s = pair.into_inner().next().unwrap().as_str();
+                        OpenTaflCommand::Finish(s.parse().unwrap())
+                    }
+
+                    Rule::error_cmd => {
+                        let s = pair.into_inner().next().unwrap().as_str();
+                        OpenTaflCommand::Error(s.parse().unwrap())
+                    }
+
+                    Rule::side_cmd => {
+                        let s = pair.into_inner().next().unwrap().as_str();
+                        OpenTaflCommand::Side(s.parse().unwrap())
+                    }
+
+                    Rule::play_cmd => {
+                        let s = pair.into_inner().next().unwrap().as_str();
+                        OpenTaflCommand::Play(s.parse().unwrap())
+                    }
+
+                    Rule::WHITESPACE | Rule::finish_code | Rule::error_code | Rule::side => {
+                        unreachable!()
+                    }
+                }
+            }
+
+            Ok(parse_value(cmd))
+        }
     }
 
     enum EngineCommand {
@@ -92,14 +195,12 @@ mod command {
                     write!(f, "simple-moves {}", if *on { "on" } else { "off" })
                 }
 
-                EngineCommand::Error(critical, message) => {
-                    write!(
-                        f,
-                        "error {} {}",
-                        if *critical { "-1" } else { "0" },
-                        message
-                    )
-                }
+                EngineCommand::Error(critical, message) => write!(
+                    f,
+                    "error {} {}",
+                    if *critical { "-1" } else { "0" },
+                    message
+                ),
 
                 EngineCommand::Status(message) => write!(f, "status {}", message),
 
@@ -178,6 +279,80 @@ mod command {
                 format!("{}", EngineCommand::Analysis(0, vec![])),
                 "error -1 not implemented"
             );
+        }
+
+        use fehler::throws;
+
+        #[throws]
+        #[test]
+        fn open_tafl_command_parse() {
+            // Goodbye
+            assert_eq!(
+                OpenTaflCommand::from_str("goodbye")?,
+                OpenTaflCommand::Goodbye
+            );
+
+            // Finish
+            assert_eq!(
+                OpenTaflCommand::from_str("finish 0")?,
+                OpenTaflCommand::Finish(FinishReason::ExitBeforeVictory),
+            );
+            assert_eq!(
+                OpenTaflCommand::from_str("finish 1")?,
+                OpenTaflCommand::Finish(FinishReason::Draw),
+            );
+            assert_eq!(
+                OpenTaflCommand::from_str("finish 2")?,
+                OpenTaflCommand::Finish(FinishReason::AttackersWin),
+            );
+            assert_eq!(
+                OpenTaflCommand::from_str("finish 3")?,
+                OpenTaflCommand::Finish(FinishReason::DeffendersWin),
+            );
+            assert!(OpenTaflCommand::from_str("finish -1").is_err());
+            assert!(OpenTaflCommand::from_str("finish 4").is_err());
+
+            // Error
+            assert_eq!(
+                OpenTaflCommand::from_str("error 1")?,
+                OpenTaflCommand::Error(ErrorCode::WrongSide),
+            );
+            assert_eq!(
+                OpenTaflCommand::from_str("error 2")?,
+                OpenTaflCommand::Error(ErrorCode::IllegalMove),
+            );
+            assert_eq!(
+                OpenTaflCommand::from_str("error 3")?,
+                OpenTaflCommand::Error(ErrorCode::BerserkModeWrongSide),
+            );
+            assert_eq!(
+                OpenTaflCommand::from_str("error 4")?,
+                OpenTaflCommand::Error(ErrorCode::BerserkModeIllegalMove),
+            );
+            assert!(OpenTaflCommand::from_str("error 0").is_err());
+            assert!(OpenTaflCommand::from_str("error 5").is_err());
+
+            // Side
+            assert_eq!(
+                OpenTaflCommand::from_str("side attackers")?,
+                OpenTaflCommand::Side(Side::Attackers),
+            );
+            assert_eq!(
+                OpenTaflCommand::from_str("side defenders")?,
+                OpenTaflCommand::Side(Side::Deffenders),
+            );
+            assert!(OpenTaflCommand::from_str("side asdf").is_err());
+
+            // Play
+            assert_eq!(
+                OpenTaflCommand::from_str("play attackers")?,
+                OpenTaflCommand::Play(Side::Attackers),
+            );
+            assert_eq!(
+                OpenTaflCommand::from_str("play defenders")?,
+                OpenTaflCommand::Play(Side::Deffenders),
+            );
+            assert!(OpenTaflCommand::from_str("play asdf").is_err());
         }
     }
 }

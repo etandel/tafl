@@ -1,0 +1,18 @@
+WHITESPACE = _{" "}
+
+goodbye_cmd = {"goodbye"}
+
+finish_code = {'0'..'3'}
+finish_cmd = {"finish" ~ finish_code}
+
+error_code = {'1'..'4'}
+error_cmd = {"error" ~ error_code}
+
+side = {"attackers" | "defenders"}
+
+play_cmd = {"play" ~ side}
+
+side_cmd = {"side" ~ side}
+
+
+cmd = {goodbye_cmd | finish_cmd | error_cmd | side_cmd | play_cmd}
