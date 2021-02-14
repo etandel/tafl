@@ -214,6 +214,7 @@ mod command {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use fehler::throws;
 
         #[test]
         fn square_new() {
@@ -281,11 +282,38 @@ mod command {
             );
         }
 
-        use fehler::throws;
+        #[test]
+        fn side_from_str(){
+            assert_eq!(Side::from_str("attackers"), Ok(Side::Attackers));
+            assert_eq!(Side::from_str("defenders"), Ok(Side::Deffenders));
+            assert!(Side::from_str("asdf").is_err());
+        }
+
+        #[test]
+        fn error_code_from_str(){
+            assert_eq!(ErrorCode::from_str("1"), Ok(ErrorCode::WrongSide));
+            assert_eq!(ErrorCode::from_str("2"), Ok(ErrorCode::IllegalMove));
+            assert_eq!(ErrorCode::from_str("3"), Ok(ErrorCode::BerserkModeWrongSide));
+            assert_eq!(ErrorCode::from_str("4"), Ok(ErrorCode::BerserkModeIllegalMove));
+            assert!(ErrorCode::from_str("").is_err());
+            assert!(ErrorCode::from_str("0").is_err());
+            assert!(ErrorCode::from_str("5").is_err());
+        }
+
+        #[test]
+        fn finish_reason_from_str(){
+            assert_eq!(FinishReason::from_str("0"), Ok(FinishReason::ExitBeforeVictory));
+            assert_eq!(FinishReason::from_str("1"), Ok(FinishReason::Draw));
+            assert_eq!(FinishReason::from_str("2"), Ok(FinishReason::AttackersWin));
+            assert_eq!(FinishReason::from_str("3"), Ok(FinishReason::DeffendersWin));
+            assert!(FinishReason::from_str("").is_err());
+            assert!(FinishReason::from_str("-1").is_err());
+            assert!(FinishReason::from_str("4").is_err());
+        }
 
         #[throws]
         #[test]
-        fn open_tafl_command_parse() {
+        fn open_tafl_command_from_str() {
             // Goodbye
             assert_eq!(
                 OpenTaflCommand::from_str("goodbye")?,
