@@ -27,6 +27,60 @@ mod command {
         }
     }
 
+    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+    enum Piece {
+        King,
+        Taflman(Side),
+        Mercenary(Side),
+        Knight(Side),
+        Commander(Side),
+    }
+
+    impl fmt::Display for Piece {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let code = match self {
+                Self::King => "K",
+
+                Self::Taflman(Side::Attackers) => "t",
+                Self::Taflman(Side::Deffenders) => "T",
+
+                Self::Mercenary(Side::Attackers) => "m",
+                Self::Mercenary(Side::Deffenders) => "M",
+
+                Self::Knight(Side::Attackers) => "n",
+                Self::Knight(Side::Deffenders) => "N",
+
+                Self::Commander(Side::Attackers) => "c",
+                Self::Commander(Side::Deffenders) => "C",
+            };
+            write!(f, "{}", code)
+        }
+    }
+
+    impl FromStr for Piece {
+        type Err = String;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            match s {
+                "K" => Ok(Self::King),
+
+                "t" => Ok(Self::Taflman(Side::Attackers)),
+                "T" => Ok(Self::Taflman(Side::Deffenders)),
+
+                "m" => Ok(Self::Mercenary(Side::Attackers)),
+                "M" => Ok(Self::Mercenary(Side::Deffenders)),
+
+                "n" => Ok(Self::Knight(Side::Attackers)),
+                "N" => Ok(Self::Knight(Side::Deffenders)),
+
+                "c" => Ok(Self::Commander(Side::Attackers)),
+                "C" => Ok(Self::Commander(Side::Deffenders)),
+
+                _ => Err(format!("Invalid piece: {}", s)),
+            }
+        }
+    }
+
     #[derive(Clone, Debug, Eq, PartialEq)]
     struct Position {}
 
@@ -261,6 +315,31 @@ mod command {
             let m = Move(Square(0, 0), Square(25, 25));
             let expected = "a1-z26";
             assert_eq!(format!("{}", m), expected);
+        }
+
+        #[test]
+        fn piece_display() {
+            assert_eq!(format!("{}", Piece::King), "K");
+            assert_eq!(format!("{}", Piece::Taflman(Side::Attackers)), "t");
+            assert_eq!(format!("{}", Piece::Taflman(Side::Deffenders)), "T");
+            assert_eq!(format!("{}", Piece::Mercenary(Side::Attackers)), "m");
+            assert_eq!(format!("{}", Piece::Mercenary(Side::Deffenders)), "M");
+            assert_eq!(format!("{}", Piece::Commander(Side::Attackers)), "c");
+            assert_eq!(format!("{}", Piece::Commander(Side::Deffenders)), "C");
+            assert_eq!(format!("{}", Piece::Knight(Side::Attackers)), "n");
+            assert_eq!(format!("{}", Piece::Knight(Side::Deffenders)), "N");
+        }
+
+        #[test]
+        fn piece_from_str() {
+            assert_eq!(Piece::from_str("t"), Ok(Piece::Taflman(Side::Attackers)));
+            assert_eq!(Piece::from_str("T"), Ok(Piece::Taflman(Side::Deffenders)));
+            assert_eq!(Piece::from_str("m"), Ok(Piece::Mercenary(Side::Attackers)));
+            assert_eq!(Piece::from_str("M"), Ok(Piece::Mercenary(Side::Deffenders)));
+            assert_eq!(Piece::from_str("c"), Ok(Piece::Commander(Side::Attackers)));
+            assert_eq!(Piece::from_str("C"), Ok(Piece::Commander(Side::Deffenders)));
+            assert_eq!(Piece::from_str("n"), Ok(Piece::Knight(Side::Attackers)));
+            assert_eq!(Piece::from_str("N"), Ok(Piece::Knight(Side::Deffenders)));
         }
 
         #[test]
