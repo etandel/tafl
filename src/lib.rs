@@ -109,7 +109,7 @@ mod command {
         Position(Position), // TODO
         Side(Side),
         Clock(u64, u64, u64, u64, u64),
-        Analyze(u64, u64),              // TODO
+        Analyze(u64, u64),
         Play(Side),
         Move(Position), // TODO
         Error(ErrorCode),
@@ -165,6 +165,14 @@ mod command {
                             .map(|subp| subp.as_str().parse::<u64>().unwrap())
                             .collect::<Vec<u64>>();
                         OpenTaflCommand::Clock(vals[0], vals[1], vals[2], vals[3], vals[4])
+                    }
+
+                    Rule::analyze_cmd => {
+                        let vals = pair
+                            .into_inner()
+                            .map(|subp| subp.as_str().parse::<u64>().unwrap())
+                            .collect::<Vec<u64>>();
+                        OpenTaflCommand::Analyze(vals[0], vals[1])
                     }
 
                     Rule::WHITESPACE
@@ -430,6 +438,19 @@ mod command {
             assert!(OpenTaflCommand::from_str("clock 1 1 1 1").is_err());
             assert!(OpenTaflCommand::from_str("clock asdf").is_err());
             assert!(OpenTaflCommand::from_str("clock asdf").is_err());
+
+            // Clock
+            assert_eq!(
+                OpenTaflCommand::from_str("analyze 15 15")?,
+                OpenTaflCommand::Analyze(15, 15),
+            );
+            assert_eq!(
+                OpenTaflCommand::from_str("analyze 1 1")?,
+                OpenTaflCommand::Analyze(1, 1),
+            );
+            assert!(OpenTaflCommand::from_str("analyze 1").is_err());
+            assert!(OpenTaflCommand::from_str("analyze").is_err());
+            assert!(OpenTaflCommand::from_str("analyze asdf").is_err());
         }
     }
 }
