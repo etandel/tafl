@@ -14,5 +14,8 @@ play_cmd = {"play" ~ side}
 
 side_cmd = {"side" ~ side}
 
+int = @{ASCII_DIGIT+}
+ot_marker = _{"*"}
+clock_cmd = {"clock" ~ int ~ ot_marker? ~ int ~ ot_marker? ~ int ~ int ~ int}
 
-cmd = {goodbye_cmd | finish_cmd | error_cmd | side_cmd | play_cmd}
+cmd = {goodbye_cmd | finish_cmd | error_cmd | side_cmd | play_cmd | clock_cmd}

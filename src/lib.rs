@@ -108,7 +108,7 @@ mod command {
         Rules(String),      // TODO
         Position(Position), // TODO
         Side(Side),
-        Clock(u64, u64, u64, u64, u64), // TODO
+        Clock(u64, u64, u64, u64, u64),
         Analyze(u64, u64),              // TODO
         Play(Side),
         Move(Position), // TODO
@@ -159,7 +159,20 @@ mod command {
                         OpenTaflCommand::Play(s.parse().unwrap())
                     }
 
-                    Rule::WHITESPACE | Rule::finish_code | Rule::error_code | Rule::side => {
+                    Rule::clock_cmd => {
+                        let vals = pair
+                            .into_inner()
+                            .map(|subp| subp.as_str().parse::<u64>().unwrap())
+                            .collect::<Vec<u64>>();
+                        OpenTaflCommand::Clock(vals[0], vals[1], vals[2], vals[3], vals[4])
+                    }
+
+                    Rule::WHITESPACE
+                    | Rule::finish_code
+                    | Rule::error_code
+                    | Rule::side
+                    | Rule::int
+                    | Rule::ot_marker => {
                         unreachable!()
                     }
                 }
@@ -283,26 +296,35 @@ mod command {
         }
 
         #[test]
-        fn side_from_str(){
+        fn side_from_str() {
             assert_eq!(Side::from_str("attackers"), Ok(Side::Attackers));
             assert_eq!(Side::from_str("defenders"), Ok(Side::Deffenders));
             assert!(Side::from_str("asdf").is_err());
         }
 
         #[test]
-        fn error_code_from_str(){
+        fn error_code_from_str() {
             assert_eq!(ErrorCode::from_str("1"), Ok(ErrorCode::WrongSide));
             assert_eq!(ErrorCode::from_str("2"), Ok(ErrorCode::IllegalMove));
-            assert_eq!(ErrorCode::from_str("3"), Ok(ErrorCode::BerserkModeWrongSide));
-            assert_eq!(ErrorCode::from_str("4"), Ok(ErrorCode::BerserkModeIllegalMove));
+            assert_eq!(
+                ErrorCode::from_str("3"),
+                Ok(ErrorCode::BerserkModeWrongSide)
+            );
+            assert_eq!(
+                ErrorCode::from_str("4"),
+                Ok(ErrorCode::BerserkModeIllegalMove)
+            );
             assert!(ErrorCode::from_str("").is_err());
             assert!(ErrorCode::from_str("0").is_err());
             assert!(ErrorCode::from_str("5").is_err());
         }
 
         #[test]
-        fn finish_reason_from_str(){
-            assert_eq!(FinishReason::from_str("0"), Ok(FinishReason::ExitBeforeVictory));
+        fn finish_reason_from_str() {
+            assert_eq!(
+                FinishReason::from_str("0"),
+                Ok(FinishReason::ExitBeforeVictory)
+            );
             assert_eq!(FinishReason::from_str("1"), Ok(FinishReason::Draw));
             assert_eq!(FinishReason::from_str("2"), Ok(FinishReason::AttackersWin));
             assert_eq!(FinishReason::from_str("3"), Ok(FinishReason::DeffendersWin));
@@ -381,6 +403,33 @@ mod command {
                 OpenTaflCommand::Play(Side::Deffenders),
             );
             assert!(OpenTaflCommand::from_str("play asdf").is_err());
+
+            // Clock
+            assert_eq!(
+                OpenTaflCommand::from_str("clock 15 15 10 2 2")?,
+                OpenTaflCommand::Clock(15, 15, 10, 2, 2),
+            );
+            assert_eq!(
+                OpenTaflCommand::from_str("clock 15* 15* 10 2 2")?,
+                OpenTaflCommand::Clock(15, 15, 10, 2, 2),
+            );
+            assert_eq!(
+                OpenTaflCommand::from_str("clock 15* 15 10 2 2")?,
+                OpenTaflCommand::Clock(15, 15, 10, 2, 2),
+            );
+            assert_eq!(
+                OpenTaflCommand::from_str("clock 15 15* 10 2 2")?,
+                OpenTaflCommand::Clock(15, 15, 10, 2, 2),
+            );
+            assert_eq!(
+                OpenTaflCommand::from_str("clock 1 1 0 0 0")?,
+                OpenTaflCommand::Clock(1, 1, 0, 0, 0),
+            );
+            assert!(OpenTaflCommand::from_str("clock 15** 15 10 2 2").is_err());
+            assert!(OpenTaflCommand::from_str("clock 15 15** 10 2 2").is_err());
+            assert!(OpenTaflCommand::from_str("clock 1 1 1 1").is_err());
+            assert!(OpenTaflCommand::from_str("clock asdf").is_err());
+            assert!(OpenTaflCommand::from_str("clock asdf").is_err());
         }
     }
 }
