@@ -82,7 +82,9 @@ mod command {
     }
 
     #[derive(Clone, Debug, Eq, PartialEq)]
-    struct Position {}
+    struct Position {
+        board: Vec<Vec<Option<Piece>>>,
+    }
 
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     struct Move(Square, Square);
@@ -229,14 +231,35 @@ mod command {
                         OpenTaflCommand::Analyze(vals[0], vals[1])
                     }
 
-                    Rule::WHITESPACE
-                    | Rule::finish_code
-                    | Rule::error_code
-                    | Rule::side
-                    | Rule::int
-                    | Rule::ot_marker => {
-                        unreachable!()
+                    Rule::position_cmd => {
+                        let mut rows: Vec<Vec<Option<Piece>>> = vec![];
+                        for row in pair.into_inner() {
+                            rows.push(vec![]);
+                            for sub in row.into_inner() {
+                                match sub.as_rule() {
+                                    Rule::piece => {
+                                        rows.last_mut()
+                                            .unwrap()
+                                            .push(sub.as_str().parse::<Piece>().ok());
+                                    }
+
+                                    Rule::int => {
+                                        let row = rows.last_mut().unwrap();
+                                        for _ in 0..sub.as_str().parse::<u64>().unwrap() {
+                                            row.push(None);
+                                        }
+                                    }
+
+                                    _ => unreachable!(),
+                                }
+                            }
+                        }
+
+                        dbg!(&rows);
+                        OpenTaflCommand::Position(Position { board: rows })
                     }
+
+                    _ => unreachable!(),
                 }
             }
 
@@ -518,7 +541,7 @@ mod command {
             assert!(OpenTaflCommand::from_str("clock asdf").is_err());
             assert!(OpenTaflCommand::from_str("clock asdf").is_err());
 
-            // Clock
+            // Analyze
             assert_eq!(
                 OpenTaflCommand::from_str("analyze 15 15")?,
                 OpenTaflCommand::Analyze(15, 15),
@@ -530,6 +553,80 @@ mod command {
             assert!(OpenTaflCommand::from_str("analyze 1").is_err());
             assert!(OpenTaflCommand::from_str("analyze").is_err());
             assert!(OpenTaflCommand::from_str("analyze asdf").is_err());
+
+            // Position
+            let expected = Position {
+                board: vec![
+                    vec![
+                        None,
+                        None,
+                        None,
+                        Some(Piece::Taflman(Side::Attackers)),
+                        None,
+                        None,
+                        None,
+                    ],
+                    vec![
+                        None,
+                        None,
+                        None,
+                        Some(Piece::Taflman(Side::Attackers)),
+                        None,
+                        None,
+                        None,
+                    ],
+                    vec![
+                        None,
+                        None,
+                        None,
+                        Some(Piece::Taflman(Side::Deffenders)),
+                        None,
+                        None,
+                        None,
+                    ],
+                    vec![
+                        Some(Piece::Taflman(Side::Attackers)),
+                        Some(Piece::Taflman(Side::Attackers)),
+                        Some(Piece::Taflman(Side::Deffenders)),
+                        Some(Piece::King),
+                        Some(Piece::Taflman(Side::Deffenders)),
+                        Some(Piece::Taflman(Side::Attackers)),
+                        Some(Piece::Taflman(Side::Attackers)),
+                    ],
+                    vec![
+                        None,
+                        None,
+                        None,
+                        Some(Piece::Taflman(Side::Deffenders)),
+                        None,
+                        None,
+                        None,
+                    ],
+                    vec![
+                        None,
+                        None,
+                        None,
+                        Some(Piece::Taflman(Side::Attackers)),
+                        None,
+                        None,
+                        None,
+                    ],
+                    vec![
+                        None,
+                        None,
+                        None,
+                        Some(Piece::Taflman(Side::Attackers)),
+                        None,
+                        None,
+                        None,
+                    ],
+                ],
+            };
+            assert_eq!(
+                OpenTaflCommand::from_str("position /3t3/3t3/3T3/ttTKTtt/3T3/3t3/3t3/")?,
+                OpenTaflCommand::Position(expected),
+            );
+            assert!(OpenTaflCommand::from_str("position //").is_err());
         }
     }
 }

@@ -20,6 +20,11 @@ clock_cmd = {"clock" ~ int ~ ot_marker? ~ int ~ ot_marker? ~ int ~ int ~ int}
 
 analyze_cmd = {"analyze" ~ int ~ int}
 
+row_sep = _{"/"}
+piece = {"m" | "M" | "K" | "n" | "N" | "c" | "C" | "t" | "T"}
+row_record = {(piece | int)+}
+position_cmd = {"position" ~ row_sep ~ (row_record ~ row_sep)+}
+
 cmd = {
     goodbye_cmd
     | finish_cmd
@@ -28,4 +33,5 @@ cmd = {
     | play_cmd
     | clock_cmd
     | analyze_cmd
+    | position_cmd
 }
