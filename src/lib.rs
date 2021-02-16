@@ -161,13 +161,13 @@ mod command {
 
     #[derive(Clone, Debug, Eq, PartialEq)]
     enum OpenTaflCommand {
-        Rules(String),      // TODO
-        Position(Position), // TODO
+        Rules(String), // TODO
+        Position(Position),
         Side(Side),
         Clock(u64, u64, u64, u64, u64),
         Analyze(u64, u64),
         Play(Side),
-        Move(Position), // TODO
+        Move(Position),
         Error(ErrorCode),
         OponentMove(Vec<Move>, Position), // TODO
         Finish(FinishReason),
@@ -175,18 +175,44 @@ mod command {
     }
 
     use anyhow::{Error, Result};
+    use pest::iterators::Pair;
     use pest::Parser;
 
     #[derive(Parser)]
     #[grammar = "command_grammar.pest"]
     struct CommandParser;
 
+    fn parse_position(pair: Pair<Rule>) -> Position {
+        let mut rows: Vec<Vec<Option<Piece>>> = vec![];
+        for row in pair.into_inner() {
+            rows.push(vec![]);
+            for sub in row.into_inner() {
+                match sub.as_rule() {
+                    Rule::piece => {
+                        rows.last_mut()
+                            .unwrap()
+                            .push(sub.as_str().parse::<Piece>().ok());
+                    }
+
+                    Rule::int => {
+                        let row = rows.last_mut().unwrap();
+                        for _ in 0..sub.as_str().parse::<u64>().unwrap() {
+                            row.push(None);
+                        }
+                    }
+
+                    _ => unreachable!(),
+                }
+            }
+        }
+
+        Position { board: rows }
+    }
+
     impl FromStr for OpenTaflCommand {
         type Err = Error;
 
         fn from_str(s: &str) -> Result<Self> {
-            use pest::iterators::Pair;
-
             let cmd = CommandParser::parse(Rule::cmd, s)?.next().unwrap(); // unfailable
 
             fn parse_value(pair: Pair<Rule>) -> OpenTaflCommand {
@@ -231,33 +257,9 @@ mod command {
                         OpenTaflCommand::Analyze(vals[0], vals[1])
                     }
 
-                    Rule::position_cmd => {
-                        let mut rows: Vec<Vec<Option<Piece>>> = vec![];
-                        for row in pair.into_inner() {
-                            rows.push(vec![]);
-                            for sub in row.into_inner() {
-                                match sub.as_rule() {
-                                    Rule::piece => {
-                                        rows.last_mut()
-                                            .unwrap()
-                                            .push(sub.as_str().parse::<Piece>().ok());
-                                    }
+                    Rule::position_cmd => OpenTaflCommand::Position(parse_position(pair)),
 
-                                    Rule::int => {
-                                        let row = rows.last_mut().unwrap();
-                                        for _ in 0..sub.as_str().parse::<u64>().unwrap() {
-                                            row.push(None);
-                                        }
-                                    }
-
-                                    _ => unreachable!(),
-                                }
-                            }
-                        }
-
-                        dbg!(&rows);
-                        OpenTaflCommand::Position(Position { board: rows })
-                    }
+                    Rule::move_cmd => OpenTaflCommand::Move(parse_position(pair)),
 
                     _ => unreachable!(),
                 }
@@ -554,8 +556,8 @@ mod command {
             assert!(OpenTaflCommand::from_str("analyze").is_err());
             assert!(OpenTaflCommand::from_str("analyze asdf").is_err());
 
-            // Position
-            let expected = Position {
+            let position_raw = "/3t3/3t3/3T3/ttTKTtt/3T3/3t3/3t3/";
+            let position_parsed = Position {
                 board: vec![
                     vec![
                         None,
@@ -622,11 +624,20 @@ mod command {
                     ],
                 ],
             };
+
+            // Position
             assert_eq!(
-                OpenTaflCommand::from_str("position /3t3/3t3/3T3/ttTKTtt/3T3/3t3/3t3/")?,
-                OpenTaflCommand::Position(expected),
+                OpenTaflCommand::from_str(&format!("position {}", position_raw))?,
+                OpenTaflCommand::Position(position_parsed.clone()),
             );
             assert!(OpenTaflCommand::from_str("position //").is_err());
+
+            // Move
+            assert_eq!(
+                OpenTaflCommand::from_str(&format!("move {}", position_raw))?,
+                OpenTaflCommand::Move(position_parsed.clone()),
+            );
+            assert!(OpenTaflCommand::from_str("Move //").is_err());
         }
     }
 }

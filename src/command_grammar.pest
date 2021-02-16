@@ -23,7 +23,11 @@ analyze_cmd = {"analyze" ~ int ~ int}
 row_sep = _{"/"}
 piece = {"m" | "M" | "K" | "n" | "N" | "c" | "C" | "t" | "T"}
 row_record = {(piece | int)+}
-position_cmd = {"position" ~ row_sep ~ (row_record ~ row_sep)+}
+position = _{row_sep ~ (row_record ~ row_sep)+}
+
+position_cmd = {"position" ~ position}
+
+move_cmd = {"move" ~ position}
 
 cmd = {
     goodbye_cmd
@@ -34,4 +38,5 @@ cmd = {
     | clock_cmd
     | analyze_cmd
     | position_cmd
+    | move_cmd
 }
