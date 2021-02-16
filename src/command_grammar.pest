@@ -23,11 +23,19 @@ analyze_cmd = {"analyze" ~ int ~ int}
 row_sep = _{"/"}
 piece = {"m" | "M" | "K" | "n" | "N" | "c" | "C" | "t" | "T"}
 row_record = {(piece | int)+}
-position = _{row_sep ~ (row_record ~ row_sep)+}
+position = {row_sep ~ (row_record ~ row_sep)+}
 
 position_cmd = {"position" ~ position}
 
 move_cmd = {"move" ~ position}
+
+square = @{ASCII_ALPHA_LOWER+ ~ ASCII_DIGIT+}
+move_sep = _{"|"}
+// only simple notation is supported
+move_ = {square ~ "-" ~ square}
+opponent_move_cmd = {
+    "opponent-move" ~ move_ ~ (move_sep ~ move_)* ~ position
+}
 
 cmd = {
     goodbye_cmd
@@ -39,4 +47,5 @@ cmd = {
     | analyze_cmd
     | position_cmd
     | move_cmd
+    | opponent_move_cmd
 }

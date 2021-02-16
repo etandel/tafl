@@ -10,20 +10,64 @@ mod command {
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     struct Square(u8, u8);
 
-    impl Square {
-        fn new(file: u8, rank: u8) -> Option<Self> {
-            if file < 26 && rank < 26 {
-                Some(Square(file, rank))
+    impl fmt::Display for Square {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let mut s = String::with_capacity(5);
+            if self.0 < 26 {
+                s.push(('a' as u8 + self.0) as char);
             } else {
-                None
+                s.push(('a' as u8 + self.0 / 26 - 1) as char);
+                s.push(('a' as u8 + self.0 % 26) as char);
+                dbg!(self.0);
+                dbg!(self.0 / 26 - 1);
+                dbg!(self.0 % 26);
+                dbg!(&s);
             }
+            write!(f, "{}{}", s, self.1 as u16 + 1)
         }
     }
 
-    impl fmt::Display for Square {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            let file = (('a' as u8) + self.0) as char;
-            write!(f, "{}{}", file, self.1 + 1)
+    impl FromStr for Square {
+        type Err = String;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            let int_start = s
+                .find(|c: char| c.is_ascii_digit())
+                .ok_or(format!("Invalid square: {}", s))?;
+
+            let (file_raw, rank_raw) = s.split_at(int_start);
+
+            let mut file = 0;
+
+            let mut chars = file_raw
+                .chars()
+                .filter(|c: &char| c.is_ascii_alphabetic())
+                .rev();
+
+            if let Some(c) = chars.next() {
+                file += c as u8 - 'a' as u8;
+            } else {
+                return Err(format!("Invalid square 1: {}", s));
+            }
+
+            if let Some(c) = chars.next() {
+                if let Some(f) = file.checked_add(26 * (c as u8 - 'a' as u8 + 1)) {
+                    file = f;
+                } else {
+                    return Err(format!("Invalid square 3: {}", s));
+                }
+            }
+
+            let rank = rank_raw
+                .parse::<u16>()
+                .map_err(|_| format!("Invalid square 2: {}", s))?
+                - 1;
+
+            if rank > 256 {
+                return Err(format!("Invalid square 4: {}", s));
+            }
+
+            Ok(Square(file as u8, rank as u8))
         }
     }
 
@@ -257,11 +301,47 @@ mod command {
                         OpenTaflCommand::Analyze(vals[0], vals[1])
                     }
 
-                    Rule::position_cmd => OpenTaflCommand::Position(parse_position(pair)),
+                    Rule::position_cmd => {
+                        OpenTaflCommand::Position(parse_position(pair.into_inner().next().unwrap()))
+                    }
 
-                    Rule::move_cmd => OpenTaflCommand::Move(parse_position(pair)),
+                    Rule::move_cmd => {
+                        OpenTaflCommand::Move(parse_position(pair.into_inner().next().unwrap()))
+                    }
 
-                    _ => unreachable!(),
+                    Rule::opponent_move_cmd => {
+                        let mut moves = vec![];
+                        let mut pos = Position { board: vec![] };
+
+                        for subp in pair.into_inner() {
+                            match subp.as_rule() {
+                                Rule::move_ => {
+                                    let squares = subp
+                                        .into_inner()
+                                        .map(|p: Pair<Rule>| p.as_str().parse::<Square>().unwrap())
+                                        .collect::<Vec<Square>>();
+
+                                    moves.push(Move(squares[0], squares[1]));
+                                }
+                                Rule::position => {
+                                    pos = parse_position(subp);
+                                }
+
+                                _ => {
+                                    dbg!(&moves);
+                                    dbg!(subp);
+                                    unreachable!()
+                                }
+                            }
+                        }
+
+                        OpenTaflCommand::OponentMove(moves, pos)
+                    }
+
+                    _ => {
+                        dbg!(pair);
+                        unreachable!()
+                    }
                 }
             }
 
@@ -317,15 +397,6 @@ mod command {
         use fehler::throws;
 
         #[test]
-        fn square_new() {
-            assert_eq!(Square::new(0, 0), Some(Square(0, 0)));
-            assert_eq!(Square::new(25, 25), Some(Square(25, 25)));
-
-            assert_eq!(Square::new(26, 0), None);
-            assert_eq!(Square::new(0, 26), None);
-        }
-
-        #[test]
         fn square_display() {
             assert_eq!(format!("{}", Square(0, 0)), "a1");
             assert_eq!(format!("{}", Square(1, 9)), "b10");
@@ -333,6 +404,30 @@ mod command {
 
             assert_eq!(format!("{}", Square(0, 25)), "a26");
             assert_eq!(format!("{}", Square(25, 25)), "z26");
+
+            assert_eq!(format!("{}", Square(26, 9)), "aa10");
+            assert_eq!(format!("{}", Square(27, 9)), "ab10");
+            assert_eq!(format!("{}", Square(51, 9)), "az10");
+            assert_eq!(format!("{}", Square(52, 9)), "ba10");
+
+            assert_eq!(format!("{}", Square(255, 255)), "iv256");
+        }
+
+        #[test]
+        fn square_from_str() {
+            assert_eq!("a1".parse(), Ok(Square(0, 0)));
+            assert_eq!("b10".parse(), Ok(Square(1, 9)));
+            assert_eq!("z1".parse(), Ok(Square(25, 0)));
+
+            assert_eq!("a26".parse(), Ok(Square(0, 25)));
+            assert_eq!("z26".parse(), Ok(Square(25, 25)));
+
+            assert_eq!("aa10".parse(), Ok(Square(26, 9)));
+            assert_eq!("ab10".parse(), Ok(Square(27, 9)));
+            assert_eq!("az10".parse(), Ok(Square(51, 9)));
+            assert_eq!("ba10".parse(), Ok(Square(52, 9)));
+
+            assert_eq!("iv256".parse(), Ok(Square(255, 255)));
         }
 
         #[test]
@@ -638,6 +733,28 @@ mod command {
                 OpenTaflCommand::Move(position_parsed.clone()),
             );
             assert!(OpenTaflCommand::from_str("Move //").is_err());
+
+            // OpponentMove
+            assert_eq!(
+                OpenTaflCommand::from_str(&format!("opponent-move d1-c1 {}", position_raw))?,
+                OpenTaflCommand::OponentMove(
+                    vec![Move(Square(3, 0), Square(2, 0))],
+                    position_parsed.clone()
+                ),
+            );
+            assert_eq!(
+                OpenTaflCommand::from_str(&format!("opponent-move e1-d1|d1-c1 {}", position_raw))?,
+                OpenTaflCommand::OponentMove(
+                    vec![
+                        Move(Square(4, 0), Square(3, 0)),
+                        Move(Square(3, 0), Square(2, 0))
+                    ],
+                    position_parsed.clone()
+                ),
+            );
+            assert!(OpenTaflCommand::from_str("opponent-move d1-c1").is_err());
+            assert!(OpenTaflCommand::from_str("opponent-move d1-c1 //").is_err());
+            assert!(OpenTaflCommand::from_str(&format!("opponent-move {}", position_raw)).is_err());
         }
     }
 }
