@@ -213,7 +213,7 @@ mod command {
         Play(Side),
         Move(Position),
         Error(ErrorCode),
-        OponentMove(Vec<Move>, Position), // TODO
+        OponentMove(Vec<Move>, Position),
         Finish(FinishReason),
         Goodbye,
     }
