@@ -37,6 +37,10 @@ opponent_move_cmd = {
     "opponent-move" ~ move_ ~ (move_sep ~ move_)* ~ position
 }
 
+board_size = {"dim:" ~ int}
+escape_type = {"c" | "e"}
+escape = {"esc:" ~ escape_type}
+
 cmd = {
     goodbye_cmd
     | finish_cmd
