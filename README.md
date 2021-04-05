@@ -1,6 +1,6 @@
 ## tafl
 
-`tafl` is an implementation of an AI player for the Tafl family of board games, aiming to be compliant with [OpenTafl](https://github.com/jslater89/OpenTafl).
+`tafl` is an AI player for the Tafl family of board games, aiming to be compliant with [OpenTafl](https://github.com/jslater89/OpenTafl).
 
 ## License
 
